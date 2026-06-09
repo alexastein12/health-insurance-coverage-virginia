@@ -1,0 +1,715 @@
+---
+title: "STAT 3280 Final Project"
+output: html_document
+author: Alexa Stein
+---
+# Socioeconomic Drivers of Health Insurance Coverage in Virginia Counties
+
+As a student with a strong interest in biostatistics and healthcare, I’ve taken several public health classes at UVA. Through these classes, I've learned about the wide range of healthcare disparities that exist in Virginia. I'm from New Jersey, which only has 21 counties, while in Virginia, there are 133 county-level entities (95 counties and 38 independent cities), so there is a much greater breadth to explore. Specifically, one key issue I’ve learned about in this topic is the disparity in healthcare insurance coverage between counties, especially between Southwest Virginia and Northern Virginia. The complexity of the American healthcare system and insurance system only complicates the issue further. Public insurance programs typically provide essential health services at a lower cost and are more accessible to lower-income populations, while private insurance generally offers greater provider choice and flexibility in care.
+
+Socioeconomic factors are known to play a significant role in shaping these geographic disparities in coverage. I seek to examine the impact of education, poverty level, population density, and median household income on the different types insurance coverage across Virginia counties, focusing on the disparities between public, private, and no insurance.
+
+# Research Questions:
+1. How does healthcare insurance coverage differ across the state of Virginia?
+2. What socioeconomic factors are the primary drivers of differences in healthcare insurance coverage rates?
+3. How strong are the relationships between key socioeconomic factors and insurance types?
+
+The data comes from the American Community Survey (ACS) 2020-2024 (5-Year-Estimates). The ACS is an ongoing, annual, sample survey by the U.S. Census Bureau that provides up-to-date data on economic, housing, demographic, and social topics. The information from the survey helps determine how hundreds of billions of dollars in federal and state funds are distributed each year. The U.S. Census Bureau survey samples about 295,000 addresses each month for an estimated total of 3.5 million households each year. This specific data is an accumulation of 60 straight months of survey responses between 2020 and 2024.
+
+While the ACS has data on every county in all 50 states, I selected to focus on a local level, exploring healthcare disparity in Virginia counties. There’s a wide variety of variables to choose from the ACS dataset, but for this exploration, these are the variables I selected:
+
+- % Total: No Health Insurance Coverage: respondent answered “No” to all insurance types at the time they took the survey
+- % Total: With Health Insurance Coverage: Public Health Coverage: includes federal or state government programs, specifically Medicare (for seniors/disabled), Medicaid, VA Health Care, Children’s Health Insurance Program (CHIP), and individual state health plans
+- % Total: With Health Insurance Coverage: Private Health Insurance: coverage provided through an employer or union, coverage purchased directly by an individual from an insurance company, or TRICARE/military health coverage
+- % Population 25 Years and Over: Bachelor's Degree	: The percentage of adults age 25+ who have completed a Bachelor’s degree (a 4-year degree)
+- Total Population: the complete count of individuals living in the county
+- Population Density (Per Sq. Mile): the total population of the county divided by the county’s total land area in square miles
+- % Population Age 18 to 64 for Whom Poverty Status Is Determined: Living in Poverty: working-age adults living below the poverty line. “For whom poverty status is determined” refers to the fact that the Census Bureau can not determine poverty for people in prisons, nursing homes, military barracks, or college dorms, so this variable is strictly looking at standard households.
+- Median Household Income (In 2024 Inflation Adjusted Dollars): If all households in the county were sorted from poorest to richest, this is the income of the household exactly in the middle. To account for inflation differences between 2020 and 2024, the Census adjusted all older incomes to be put in 2024 dollars to ensure accurate comparison.
+
+Please note that the health insurance classifications (public or private) are not mutually exclusive, as people may be covered by more than one at the same time. Individuals with multiple insurance types (e.g., Medicare and supplemental private plans) are counted in both categories. When looking at the state of Virginia in aggregate, the ACS 2020-2024 data shows that 6.9% of the state has no health insurance coverage, and 93.1% has health insurance coverage. Within those who have health insurance coverage, 33.6% have public health coverage, and 73.2% have private health insurance coverage, totaling 106.8%. Since we can subtract these values to find the proportion of people who have both types of coverage: 106.8% - 93.1% = 13.7% of Virginians have both public and private health insurance.
+
+
+```{r, warning = FALSE, message = FALSE, echo = FALSE}
+library(ggplot2)
+library(tidyverse)
+library(ggcorrplot)
+library(gganimate)
+library(transformr)
+library(kableExtra)
+library(colorblindr)
+library(scales)
+
+counties <- read.csv("Virginia Counties.csv")
+
+counties <- read.csv("Virginia Counties.csv")
+
+counties <- counties %>%
+  mutate(County = str_remove(County, ",.*"),
+         County = str_replace(County, " city", " City"))
+
+counties_display <- counties %>%
+  mutate(Total_Population = comma(Total_Population),
+         Median_Household_Income = comma(Median_Household_Income),
+         Population_Density = comma(Population_Density, accuracy = 0.01))
+
+knitr::kable(head(counties_display),
+             caption = "Preivew of Dataset",
+             col.names = c("FIPS", "County", "Uninsured (%)", "Public (%)",
+                           "Private (%)", "Bachelor's (%)", "Total Population",
+                           "Population Density", "Poverty (%)",
+                           "Median Household Income")) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
+  full_width = FALSE)
+```
+
+
+## Visualization 1: Healthcare Insurance Coverage Across Virginia Counties
+This first visualization displays the percentage of the population in each county with each type of health insurance (public, private, or uninsured). In all three graphs, the counties are ordered from the county with the lowest percentage to the county with the highest percentage to show the overall trend of which insurance types are most common in Virginia counties. A dashed line shows the state average rate for each insurance type.
+
+```{r, warning = FALSE, message = FALSE, echo = FALSE}
+counties_pivotlonger <- counties %>%
+  pivot_longer(
+    cols = c(Private, Public, Uninsured),
+    names_to = "Insurance_Type",
+    values_to = "Coverage_Rate"
+  )
+
+
+data_faceted <- counties_pivotlonger %>%
+  group_by(Insurance_Type) %>%
+  arrange(Coverage_Rate, .by_group = TRUE) %>%
+  mutate(Index = row_number(),
+         Group_Mean = mean(Coverage_Rate, na.rm = TRUE)) %>%
+  ungroup() %>%
+  mutate(Insurance_Type = factor(Insurance_Type, levels = c("Uninsured", "Public", "Private")))
+
+ggplot(data_faceted, aes(x = Index, y = Coverage_Rate)) +
+  geom_hline(aes(yintercept = Group_Mean),
+             color = "black",
+             linetype = "dashed",
+             linewidth = 1) +
+  geom_point(aes(color = Insurance_Type), alpha = 0.8) +
+  scale_color_manual(values = c("Uninsured" = "lightblue", Private = "navy", "Public" = "orange")) +
+  scale_y_continuous(limits = c(0, 100)) +
+  facet_wrap(~ Insurance_Type, ncol = 3) +
+  labs(x = "Counties",
+       y = "Population (%)",
+       title = "Healthcare Insurance Rate Across Virginia Counties") +
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5, face = "bold"),
+          axis.text.x = element_blank(),
+          axis.ticks.x = element_blank(),
+          panel.grid.minor = element_blank(),
+          panel.grid.major.x = element_blank(),
+          legend.position = "none",
+          strip.text = element_text(face = "bold", size = 12))
+```
+
+```{r, warning = FALSE, message = FALSE, echo = FALSE}
+ranked_uninsured <- counties %>%
+  select(County, Uninsured) %>%
+  arrange(Uninsured)
+View(ranked_uninsured)
+
+ranked_public <- counties %>%
+  select(County, Public) %>%
+  arrange(Public)
+View(ranked_public)
+
+ranked_private <- counties %>%
+  select(County, Private) %>%
+  arrange(Private)
+View(ranked_private)
+```
+
+As can be seen in the scatterplots, for the majority of counties, private health insurance coverage is the most common, followed by public, with no insurance as the category with the smallest percentage of the population nearly every county. The dashed line represents the statewide average. Originally, I had been planning to focus my exploration on the relationship between socioeconomic status and the percentage of the population that is uninsured, but I quickly discovered that this is not where the true story lies. The uninsured rate in each county is fairly consistent with the overall state average of 6.9%, with the lowest uninsured population at 1.70% (Falls Church City) and the highest at 12.26% (Winchester City), aside from the two outliers (Manassas City and Manassas Park City at 19.22% and 22.12%).
+
+I realized that the similarity in uninsured rates across counties are due to state-level policies, economic factors, and uniform access to federal insurance mechanisms. One of the biggest reasons includes the 2019 statewide Medicaid Expansion, which extended Medicaid to low-income adults across the state, creating a uniform, eligibility-based program that lowered uninsured rates similarly in many counties and gave more Virginia residents access to public insurance. Additionally, subsidized coverage through the Health Insurance Marketplaces starting in 2014 under the Affordable Care Act is another factor in these similar uninsured rates. The actual story lies in the difference between the percentage of the population with public coverage and with private coverage, as these two rates have much greater variability between counties. Public insurance coverage rates ranges from Loundoun County at 17.82% to Lee County at 62.32%. Private insurance ranges from Buchanan County at 42.70% to Falls Church City at 90.83%.
+
+## Visualization 2: Geographic Distribution of Public Insurance in Virginia
+
+<div class='tableauPlaceholder' id='viz1776308590449' style='position: relative'><noscript><a href='#'><img alt='Public Coverage (%) by County in Virginia ' src='https:&#47;&#47;public.tableau.com&#47;static&#47;images&#47;ST&#47;STAT3280TableauProjectGraphs&#47;PublicCoveragebyCountyinVirginia&#47;1_rss.png' style='border: none' /></a></noscript><object class='tableauViz'  style='display:none;'><param name='host_url' value='https%3A%2F%2Fpublic.tableau.com%2F' /> <param name='embed_code_version' value='3' /> <param name='site_root' value='' /><param name='name' value='STAT3280TableauProjectGraphs&#47;PublicCoveragebyCountyinVirginia' /><param name='tabs' value='no' /><param name='toolbar' value='yes' /><param name='static_image' value='https:&#47;&#47;public.tableau.com&#47;static&#47;images&#47;ST&#47;STAT3280TableauProjectGraphs&#47;PublicCoveragebyCountyinVirginia&#47;1.png' /> <param name='animate_transition' value='yes' /><param name='display_static_image' value='yes' /><param name='display_spinner' value='yes' /><param name='display_overlay' value='yes' /><param name='display_count' value='yes' /><param name='language' value='en-US' /><param name='filter' value='publish=yes' /></object></div>
+```{js, echo = FALSE}
+var divElement = document.getElementById('viz1776308590449');                    var vizElement = divElement.getElementsByTagName('object')[0];                    vizElement.style.width='100%';vizElement.style.height=(divElement.offsetWidth*0.75)+'px';                    var scriptElement = document.createElement('script');                    scriptElement.src = 'https://public.tableau.com/javascripts/api/viz_v1.js';                    vizElement.parentNode.insertBefore(scriptElement, vizElement);
+```
+
+This choropleth map allows a comparison of public insurance coverage rates, and it can be seen that healthcare access is not evenly distributed throughout Virginia. Here, we can see geographic clusters of high percentages of public insurance coverage, represented by darker shades of orange, in South and Southwest Virginia, and lighter shades of orange in Northern Virginia. We will now explore potential reasons for these differences.
+
+## Visualization 3: The Impact of Education Level
+```{r, warning = FALSE, message = FALSE, echo = FALSE}
+base_points <- counties_pivotlonger %>%
+  mutate(Point_ID = paste(County, Insurance_Type, sep = "_"))
+
+line <- function(data, line_group, stage_name){
+  fit <- lm(Coverage_Rate ~ Bachelors, data = data)
+  x_range <- range(data$Bachelors, na.rm = TRUE)
+  y_prediction <- predict(fit, newdata = data.frame(Bachelors = x_range))
+  
+  tibble(stage = stage_name,
+         Line_Group = line_group,
+         Bachelors = x_range,
+         Coverage_Rate = y_prediction)
+}
+
+stage_points <- bind_rows(base_points %>%
+                            mutate(
+                              stage = "1. Combined View",
+                              Display_Color = case_when(
+                                Insurance_Type %in% c("Private", "Public") ~ "Black",
+                                Insurance_Type == "Uninsured" ~ "Uninsured")),
+  
+  base_points %>%
+    mutate(
+      stage = "2. Remove Combined Trend Line",
+      Display_Color = case_when(
+        Insurance_Type %in% c("Private", "Public") ~ "Black",
+        Insurance_Type == "Uninsured" ~ "Uninsured")),
+  base_points %>%
+    mutate(
+      stage = "3. Reveal Private Coverage",
+      Display_Color = case_when(
+        Insurance_Type == "Private" ~ "Private",
+        Insurance_Type == "Public" ~ "Black",
+        Insurance_Type == "Uninsured" ~ "Uninsured")),
+  base_points %>%
+    mutate(
+      stage = "4. Reveal Public Coverage",
+      Display_Color = case_when(
+        Insurance_Type == "Private" ~ "Private",
+        Insurance_Type == "Public" ~ "Public",
+        Insurance_Type == "Uninsured" ~ "Uninsured"))
+)
+
+stage_points$stage <- factor(stage_points$stage,
+                             levels = c("1. Combined View",
+                                        "2. Remove Combined Trend Line",
+                                        "3. Reveal Private Coverage",
+                                        "4. Reveal Public Coverage"))
+
+line_data <- bind_rows(line(
+  counties_pivotlonger%>% filter(Insurance_Type %in% c("Private", "Public")),
+    "Black",
+    "1. Combined View"),
+  line(
+    counties_pivotlonger %>% filter(Insurance_Type == "Uninsured"),
+    "Uninsured",
+    "1. Combined View"),
+  
+  line(
+    counties_pivotlonger %>% filter(Insurance_Type == "Uninsured"),
+    "Uninsured",
+    "2. Remove Combined Trend Line"),
+  
+  line(
+    counties_pivotlonger %>% filter(Insurance_Type == "Private"),
+    "Private",
+    "3. Reveal Private Coverage"),
+  line(
+    counties_pivotlonger %>% filter(Insurance_Type == "Uninsured"),
+    "Uninsured",
+    "3. Reveal Private Coverage"),
+  
+  line(
+    counties_pivotlonger %>% filter(Insurance_Type == "Private"),
+    "Private",
+    "4. Reveal Public Coverage"),
+  line(
+    counties_pivotlonger %>% filter(Insurance_Type == "Public"),
+    "Public",
+    "4. Reveal Public Coverage"),
+  line(
+    counties_pivotlonger %>% filter(Insurance_Type == "Uninsured"),
+    "Uninsured",
+    "4. Reveal Public Coverage"),)
+
+line_data$stage <- factor(line_data$stage, levels = levels(stage_points$stage))
+
+educationplot <- ggplot(stage_points, aes(x = Bachelors,
+                                          y = Coverage_Rate,
+                                          group = Point_ID)) +
+  geom_point(aes(color = Display_Color,
+             shape = Insurance_Type),
+             size = 2.5,
+             alpha = 0.7) +
+  geom_line(data = line_data, aes(x = Bachelors,
+                                  y = Coverage_Rate,
+                                  color = Line_Group,
+                                  group = Line_Group),
+            linewidth = 1,
+            inherit.aes = FALSE) +
+  scale_color_manual(values = c("Black" = "black",
+                                "Private" = "navy",
+                                "Public" = "orange",
+                                "Uninsured" = "lightblue"),
+    breaks = c("Private", "Public", "Uninsured"),
+    labels = c("Private", "Public", "Uninsured")) +
+  scale_shape_manual(values = c("Private" = 0,
+                                "Public" = 2,
+                                "Uninsured" = 1)) +
+  labs(x = "% of Adults (Age 25+) With a Bachelor's Degree or Higher",
+       y = "Population Coverage Rate",
+       title = "Relationship Between Education and Insurance Coverage",
+       subtitle = "{current_frame}",
+       color = "Insurance Type",
+       shape = "Insurance Type") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"),
+        plot.subtitle = element_text(hjust = 0.5)) +
+  transition_manual(stage) +
+  enter_fade() +
+  exit_fade()
+
+animate(educationplot, nframes = 80, fps = 10, width = 1200, height = 800,
+        units = "px", renderer = gifski_renderer())
+```
+The first socioeconomic variable to be explored is education. This animated scatterplot shows how the percentage of adults in each county (age 25+) who have completed a Bachelor’s degree is associated with each insurance coverage type. There is a clear upward trend in private insurance, represented by the navy squares, which reveals that as the percentage of adults in a county who have completed a bachelor's degree increases, the percentage of residents in the county with private insurance increases as well. On the other hand, the percentage of residents in a county with public insurance decreases as the adults with a Bachelor's degree in a county increases. Thus, educational attainment has a positive correlation with private insurance and a negative correlation with public insurance. The percentage of residents with no health insurance coverage remains constant as the percentage of adults with Bachelor's degree increases, reinforcing that the percent of the population that is uninsured does not have much variation between counties. These results indicate that education is a key factor in driving differences in health insurance coverage between public and private.
+
+## Visualization 4: The Impact of Poverty
+```{r, warning = FALSE, message = FALSE, echo = FALSE}
+counties_poverty <- counties %>%
+  mutate(
+    Poverty_Level = case_when(
+      Poverty <= quantile(Poverty, 0.33, na.rm = TRUE) ~ "Low Poverty Counties",
+      Poverty > quantile(Poverty, 0.33, na.rm = TRUE) &
+        Poverty <= quantile(Poverty, 0.66, na.rm = TRUE) ~ "Medium Poverty Counties",
+      TRUE ~ "High Poverty Counties"
+    ),
+    Poverty_Level = factor(Poverty_Level,
+                           levels = c("Low Poverty Counties",
+                                      "Medium Poverty Counties",
+                                      "High Poverty Counties"))
+  ) %>%
+  group_by(Poverty_Level) %>%
+  summarize(
+    Private = mean(Private, na.rm = TRUE),
+    Public = mean(Public, na.rm = TRUE),
+    Uninsured = mean(Uninsured, na.rm = TRUE)) %>%
+  pivot_longer(
+    cols = c(Private, Public, Uninsured),
+    names_to = "Insurance_Type",
+    values_to = "Average_Rate"
+  )
+
+povertyplot <- ggplot(counties_poverty, aes(x = Poverty_Level,
+                             y = Average_Rate,
+                             color = Insurance_Type,
+                             group = Insurance_Type)) +
+  geom_linerange(aes(ymin = 0,
+                   ymax = Average_Rate),
+               position = position_dodge(width = 0.4),
+               linewidth = 1, alpha = 0.7) +
+  geom_point(position = position_dodge(width = 0.4), size = 6) +
+  geom_text(aes(label = paste0(round(Average_Rate, 1), "%")),
+            position = position_dodge(width = 0.4),
+            vjust = -1.8, size = 3.5, fontface = "bold", show.legend = FALSE) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.15))) + 
+  scale_color_manual(values = c("Private" = "navy", "Public" = "orange", "Uninsured" = "lightblue")) +
+  labs(x = "Poverty Level",
+       y = "Average Coverage Rate (%)",
+       color = "Insurance Type",
+       title = "Relationship Between Poverty Rates and Insurance Coverage") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"),
+        legend.position = "top",
+        legend.title = element_text(face = "bold"))
+
+povertyplot
+```
+
+The next socioeconomic variable to be explored is poverty.  Counties were grouped into three levels of poverty status, and the titles of low, medium, and high poverty are relative to other counties in Virginia. The lowest third of counties with a population categorized as being in poverty are classified as "low poverty", the middle third classified as "medium poverty", and the counties in the highest third poverty statuses are classified as "high poverty." From the graph, we can see that the navy line decreases, indicating that as poverty increases, the percentage of the county with private insurance decreases. The orange line increases, indicating that the percentage of counties with public insurance increases as poverty increases. The light blue line, which is the percentage uninsured, remains fairly constant across all three groups, which is consistent with my previous findings. This pattern suggests poverty rate is closely associated with variation in type of healthcare insurance coverage.
+
+## Visualization 5: The Impact of Population Density
+
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+counties_poverty <- counties %>%
+  mutate(County = str_remove(County, ",.*"),
+         County = str_replace(County, " city", " City")) %>%
+  mutate(Density_Category = case_when(
+    Population_Density < 100 ~ "Rural",
+    Population_Density >= 100 & Population_Density <= 1000 ~ "Suburban",
+    TRUE ~ "Urban"
+    ))
+
+ggplot(counties_poverty, aes(x = Density_Category, y = Public)) +
+  geom_violin(aes(fill = Density_Category), alpha = 0.7) +
+  scale_fill_manual(values = c("Rural" = "blue", "Suburban" = "hotpink", "Urban" = "#355E3B")) +
+  geom_boxplot(width = 0.2, fill = "white") +
+  geom_jitter(width = 0.08, alpha = 0.7) +
+  labs(x = NULL,
+       y = "Public Insurance Rate (%)",
+       title = "Distributions of Public Insurance Rates by Population Density Category") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5),
+        legend.position = "none")
+```
+
+This visualization shows the distribution of public insurance rates across counties in Virginia, categorized by population density into rural, urban, and suburban groups. These classifications were defined using standard thresholds: counties with fewer than 100 people per square mile are considered "rural," those between 100 and 1000 people per square mile are "suburban," and those with more than 1000 people per square mile are "urban."
+
+The violin plot, combined with boxplots and individual data points, offers a detailed look at both the distribution and the variability within each group. Rural counties tend to have higher public insurance rates than both suburban and urban counties. The interquartile range (IQR) of rural counties lies entirely above the IQR of suburban counties and largely above the IQR of urban counties, indicating that the majority of rural counties have higher public coverage rates than counties in the other two categories. The median public insurance rate of rural counties is approximately 12 percentage points higher than for suburban counties and about 10 points higher than for urban counties.
+
+Urban counties have the largest IQR, suggesting greater variability in public insurance rates within this group, without accounting for outliers. Suburban counties generally have lower public insurance rates, though several outliers indicate that a few counties deviate substantially from the overall trend. Overall, there is overlap in public insurance rates across all three categories and significant variation within each group, suggesting although rural counties generally have higher public insurance rates, population density does not fully explain the differences across counties.
+
+## Visualization 6: How Coverage Differs Structurally Between Counties
+```{r, warning = FALSE, message = FALSE, echo = FALSE}
+library(shiny)
+knitr::include_app("https://alexastein.shinyapps.io/STAT_3280_Project_App2/", height = "650px")
+```
+
+```{r, eval = FALSE}
+library(dplyr)
+library(ggplot2)
+library(stringr)
+library(shiny)
+library(plotly)
+
+counties <- read.csv("Virginia Counties.csv")
+counties3 <- counties %>%
+  mutate(County = str_remove(County, ",.*"),
+         County = str_replace(County, " city", " City")) %>%
+  mutate(Density_Category = case_when(
+    Population_Density < 100 ~ "Rural",
+    Population_Density >= 100 & Population_Density <= 1000 ~ "Suburban",
+    TRUE ~ "Urban"),
+    Gap = Private - Public)
+
+ui <- fluidPage(
+  titlePanel("Coverage Patterns Across Virginia Counties"),
+  sidebarLayout(
+    sidebarPanel(
+      selectInput(
+        inputId = "xvar",
+        label = "Choose x-axis:",
+        choices = c(
+          "Poverty Rate" = "Poverty",
+          "Bachelor's Degree %" = "Bachelors",
+          "Median Household Income" = "Median_Household_Income"
+          ),
+        selected = "Poverty"
+        ),
+      checkboxGroupInput(
+        inputId = "density",
+        label = "Select category(s):",
+        choices = unique(counties3$Density_Category),
+        selected = unique(counties3$Density_Category)
+      ),
+      checkboxInput(
+        inputId = "trend",
+        label = "Show trend line",
+        value = FALSE
+      ),
+      selectInput(
+        inputId = "highlight_county",
+        label = "Highlight a county:",
+        choices = c("None", sort(unique(counties3$County))),
+        selected = "None"
+      )),
+    mainPanel(
+      tabsetPanel(
+        tabPanel("Scatter Plot",
+                 plotlyOutput("scatterPlot", height = "550px")),
+        tabPanel("Summary Table",
+                 br(),
+                 tableOutput("summaryTable")))
+    )
+  )
+)
+
+
+server <- function(input, output){
+  filtered_data <- reactive({counties3 %>%
+      filter(
+        Density_Category %in% input$density
+      )})
+  output$scatterPlot <- renderPlotly({
+  plot_data <- filtered_data()
+  req(nrow(plot_data) > 0)
+  
+  x_label <- case_when(
+    input$xvar == "Poverty" ~ "Poverty Rate (%)",
+    input$xvar == "Bachelors" ~ "Bachelor's Degree (%)",
+    input$xvar == "Median_Household_Income" ~ "Median Household Income"
+  )
+  x_min <- min(plot_data[[input$xvar]],  na.rm = TRUE)
+  x_max <- max(plot_data[[input$xvar]],  na.rm = TRUE)
+  y_min <- min(plot_data$Gap,  na.rm = TRUE)
+  y_max <- max(plot_data$Gap,  na.rm = TRUE)
+  
+  rect_data <- data.frame(xmin = x_min,
+                          xmax = x_max,
+                          ymin = y_min,
+                          ymax = y_max)
+  
+  plot <- ggplot(plot_data,
+                  aes_string(x = input$xvar,
+                  y = "Gap")) +
+          geom_rect(data = rect_data, aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = 0),
+                    fill = "#f2e0e0", alpha = 0.5, inherit.aes = FALSE) +
+          geom_rect(data = rect_data, aes(xmin = xmin, xmax = xmax, ymin = 0, ymax = ymax),
+              fill = "#d9e6f2", alpha = 0.5, inherit.aes = FALSE) +
+          geom_point(aes(color = Density_Category,
+                         text = paste0("County: ", County,
+                                       "<br>Gap: ", round(Gap, 1))),
+                     size = 2.5,
+                     alpha = 0.8) +
+          scale_color_manual(
+            values = c("Rural" = "blue",
+                       "Suburban" = "hotpink",
+                       "Urban" = "#355E3B")) +
+          labs(x = x_label,
+               y = "Private - Public Coverage Gap",
+               color = "Population Density",
+               title = "Coverage Patterns Across Virginia Counties",
+               subtitle = "Above 0 = more private coverage,
+               below 0 = more public coverage") +
+            theme_minimal() +
+            theme(plot.title = element_text(face = "bold", hjust = 0.5),
+                  plot.subtitle = element_text(hjust = 0.5))
+          if (input$trend) {
+            plot <- plot + geom_smooth(method = "lm",
+                                         se = FALSE,
+                                         color = "black",
+                                         linewidth = 0.8)
+            }
+          if (input$highlight_county != "None") {
+              highlight_data <- plot_data %>%
+                filter(County == input$highlight_county)
+              
+            plot <- plot + geom_point(data = highlight_data,
+                                        aes_string(x = input$xvar, y = "Gap"),
+                                        inherit.aes = FALSE,
+                                        color = "black",
+                                        fill = "yellow",
+                                        shape = 21,
+                                        size = 4,
+                                        stroke = 1.2) +
+                geom_text(data = highlight_data,
+                          aes_string(x = input$xvar,
+                                     y = "Gap",
+                                     label = "County"),
+                          inherit.aes = FALSE,
+                          nudge_y = 1,
+                          color = "black",
+                          size = 3.5)
+  }
+              ggplotly(plot, tooltip = "text")
+  })
+  
+  output$summaryTable <- renderTable({
+    plot_data <- filtered_data()
+    req(nrow(plot_data) > 0)
+    
+    x_name <- case_when(input$xvar == "Poverty" ~ "Average Poverty Rate (%)",
+                        input$xvar == "Bachelors" ~ "Average Bachelor's Degree %",
+                        input$xvar == "Median_Household_Income" ~ "Average Median Household Income")
+    
+    summary_df <- plot_data %>%
+      group_by(Density_Category) %>%
+      summarise(`Number of Counties` = n(),
+                 value = round(mean(.data[[input$xvar]], na.rm = TRUE), 2),
+                `Average Gap` = round(mean(Gap, na.rm = TRUE), 2),
+                `Median Gap` = round(median(Gap, na.rm = TRUE), 2),
+                `Minimum Gap` = round(min(Gap, na.rm = TRUE), 2),
+                `Maximum Gap` = round(max(Gap, na.rm = TRUE), 2),
+                .groups = "drop")
+    names(summary_df)[1] <- "Density Category"
+    names(summary_df)[3] <- x_name
+    summary_df
+  })
+}
+
+shinyApp(ui = ui, server = server)
+```
+
+
+This app allows the user to explore how the private-public coverage gap changes with poverty, educational attainment, and median household income across Virginia counties. By filtering based on population density and selecting different socioeconomic variables, the app highlights how coverage patterns are not random; they are systematically related to socioeconomic conditions. Counties with higher poverty and lower education tend to have smaller private-public gaps, indicating greater reliance on public insurance, whereas counties with higher income and education tend to have larger gaps with private coverage as the dominant type. These relationships are consistent across population density categories, emphasizing the role of socioeconomic factors in driving insurance coverage outcomes. The summary table provides additional information by showing the average values and the distribution of coverage gaps within each density category.
+
+## Visualization 7: Specific County Comparison
+```{r, warning = FALSE, message = FALSE, echo = FALSE}
+library(shiny)
+knitr::include_app("https://alexastein.shinyapps.io/STAT_3280_Project_App1/", height = "650px")
+```
+
+```{r, eval = FALSE}
+library(tidyverse)
+library(ggplot2)
+counties <- read.csv("Virginia Counties.csv")
+counties2 <- counties %>%
+  mutate(County = str_remove(County, ",.*"),
+         County = str_replace(County, " city", " City")) %>%
+  mutate(Density_Category = case_when(
+    Population_Density < 100 ~ "Rural",
+    Population_Density >= 100 & Population_Density <= 1000 ~ "Suburban",
+    TRUE ~ "Urban"
+    ))
+
+rural_list <- counties2 %>%
+  filter(Density_Category == "Rural") %>%
+  arrange(County) %>%
+  pull(County)
+
+suburban_list <- counties2 %>%
+  filter(Density_Category == "Suburban") %>%
+  arrange(County) %>%
+  pull(County)
+
+urban_list <- counties2 %>%
+  filter(Density_Category == "Urban") %>%
+  arrange(County) %>%
+  pull(County)
+
+
+ui <- fluidPage(
+  titlePanel("County Comparison: Healthcare Insurance Coverage"),
+  sidebarPanel(
+    helpText("Select counties from the dropdown menu:"),
+    selectizeInput(inputId = "rural_list",
+                   label = "Rural Counties:",
+                   choices = rural_list,
+                   selected = rural_list[1:2],
+                   multiple = TRUE,
+                   options = list(plugins = list('remove_button'))),
+    selectizeInput(inputId = "suburban_list",
+                   label = "Suburban Counties:",
+                   choices = suburban_list,
+                   selected = suburban_list[1:2],
+                   multiple = TRUE,
+                   options = list(plugins = list('remove_button'))),
+    selectizeInput(inputId = "urban_list",
+                   label = "Urban Counties:",
+                   choices = urban_list,
+                   selected = urban_list[c(1,7)],
+                   multiple = TRUE,
+                   options = list(plugins = list('remove_button'))),
+    radioButtons(inputId = "view_type",
+                 label = "View:",
+                 choices = c("Coverage Breakdown", "Private - Public Gap"),
+                 selected = "Coverage Breakdown")
+  ),
+  mainPanel(
+    plotOutput("barchart")
+  )
+)
+
+server <- function(input, output){
+  output$barchart <- renderPlot({
+    picked_counties <- c(input$rural_list, input$suburban_list, input$urban_list)
+    if (input$view_type == "Private - Public Gap"){
+      plot_data <- counties2 %>%
+        filter(County %in% picked_counties) %>%
+        mutate(
+          Gap = Private - Public,
+          Gap_Type = factor(if_else(Gap >= 0, "More Private", "More Public"),
+                            levels = c("More Private", "More Public")),
+          County = factor(County, levels = rev(picked_counties))
+        )
+      state_avg_gap <- (73.2 - 33.6)
+      ggplot(plot_data, aes(x = County, y = Gap, fill = Gap_Type)) +
+        geom_col(color = "black", show.legend = TRUE) +
+        geom_hline(yintercept = state_avg_gap,
+                   linetype = "dashed",
+                   color = "black",
+                   linewidth = 2) +
+        coord_flip() +
+        scale_fill_manual(values = c("More Private" = "navy",
+                                     "More Public" = "orange"),
+                          limits = c("More Private", "More Public"),
+                          drop = FALSE) +
+        labs(x = "Counties",
+             y = "Private - Public Gap (%)",
+             fill = "Dominant Coverage",
+             title = "Difference Between Private and Public Insurance Coverage",
+             subtitle = "Dashed line shows Virginia average gap") +
+        theme_minimal() +
+        theme(plot.title = element_text(face = "bold", hjust = 0.5),
+              plot.subtitle = element_text(hjust = 0.5))
+    } else {
+    plot_data <- counties2 %>%
+      filter(County %in% picked_counties) %>%
+      mutate(County = factor(County, levels = rev(picked_counties))) %>%
+      pivot_longer(cols = c(Private, Public, Uninsured),
+                   names_to = "Coverage_Type",
+                   values_to = "Percentage")
+    ggplot(plot_data, aes(x = County,
+                          y = Percentage,
+                          fill = Coverage_Type)) +
+      geom_col(position = "dodge", color = "black") +
+      coord_flip() + 
+      scale_fill_manual(values = c("Private" = "navy",
+                                   "Public" = "orange",
+                                   "Uninsured" = "lightblue")) +
+      labs(
+        x = "Counties",
+        y = "Percentage of Population (%)",
+        fill = "Coverage Type",
+        title = "Percentage of Population With Each Coverage Type") +
+      theme_minimal() +
+      theme(plot.title = element_text(face = "bold", hjust = 0.5))}
+      })
+}
+
+shinyApp(ui = ui, server = server)
+    
+```
+
+
+This app allows users to compare specific Virginia counties and examine how they differ in coverage. Both the full coverage breakdown or the gap between private and public coverage can be viewed, and the selected counties are also compared to the statewide average. The app shows that that counties within the same state, and even the same population density category, can have very different insurance structures, reinforcing an important takeaway: relying on the state average alone hides local variation, so understanding healthcare coverage in Virginia requires looking at county-level differences.
+
+## Visualization 8: How do all the variables relate?
+```{r, message = FALSE, warning = FALSE, echo = FALSE}
+numeric_counties <- counties %>%
+  dplyr::select(where(is.numeric)) %>%
+  dplyr::select(-FIPS) %>%
+  rename("Public Insurance Rate(%)" = Public,
+         "Private Insurance Rate (%)" = Private,
+         "Bachelor's Degree (%)" = Bachelors,
+         "Total Population" = Total_Population,
+         "Population Density" = Population_Density,
+         "Median Income" = Median_Household_Income,
+         "Uninsurance Rate (%)" = Uninsured,
+         "Poverty Rate (%)" = Poverty
+         )
+
+correlation_matrix <- cor(numeric_counties, use = "complete.obs")
+
+corrplot <- ggcorrplot(correlation_matrix,
+           method = "square",
+           type = "lower",
+           colors = c("red", "white", "blue"),
+           lab = TRUE,
+           lab_size = 3,
+           title = "Socioeconomic Factors of Health Insurance in Virginia",
+           legend.title = "Correlation\n(r-value)") +
+  theme(plot.title = element_text(size = 9, face = "bold", hjust = 0.5))
+
+corrplot
+```
+
+This correlation matrix heatmap illustrates the strength and direction of the relationship between all variables in the data. It quantifies the relationship between the socioeconomic variables and insurance coverage types, and it provides insight into how these factors interact and reinforces patterns observed in earlier visualizations. 
+
+There are several key correlations to note. Public insurance has a strong negative relationship with education (r = -0.75) and median income (r = -0.82) and a moderate negative relationship with population density (-0.44). In contrast, it is moderately positively correlated with poverty (r = 0.48). These relationships indicate that counties with lower levels of education and income, and higher levels of poverty, tend to have a heavier reliance on public insurance.
+
+Private insurance coverage reveals the opposite pattern. It has a strong positive relationship with education (r = 0.77) and median income (r = 0.81) and is moderately negatively correlation with poverty (r = -0.59), reinforcing the pattern that counties with higher educational attainment, income, and lower poverty rates tend to have higher private insurance rates.
+
+The uninsured rate exhibits a weak correlation with all variables, reinforcing my original finding that healthcare disparities across counties are not primarily due to whether individuals have insurance but rather by the type of insurance they have.
+
+Additionally, public and private insurance are strongly negatively correlated (r = -0.87), which is grounded in the fact that, in the American healthcare system, the majority of people only have one type of healthcare insurance, and there is a structural tradeoff between these coverage types.
+
+Overall, the heatmap emphasizes that education and median household income are the variables most strongly associated with differences in insurance type. Though correlation does not imply causation, the strength of these relationships suggest that these two socioeconomic factors play a critical role in driving healthcare coverage patterns across Virginia counties.
+
+## Conclusion
+In Virginia, health insurance disparities are less about being insured or uninsured and more about the type of insurance individuals have. Socioeconomic factors, especially income, education, and poverty, are the strongest drivers of whether a resident relies on public or private insurance, while population density has a more limited role.
+
+There is a consistent pattern across the visualizations. The choropleth map highlights geographic clustering of public coverage, the education, poverty, and population density graphs reveal strong relationships between socioeconomic variables and insurance type, and the correlation matrix confirms that income and education are the strongest predictors of coverage differences. The interactive apps additionally demonstrate that these patterns exist at the county level, revealing local variation even within the same population density category.
+
+It is thus crucial for policymakers to look beyond statewide averages and account for local socioeconomic conditions when addressing healthcare disparities, specifically when it comes to the insurance profile of Virginia counties. Targeted, county-level approaches may be more effective than broad, state-level solutions.
+
+
+
+```{r, warning = FALSE, message = FALSE, include = FALSE}
+cvd_grid(povertyplot)
+```
+```{r, warning = FALSE, message = FALSE, include = FALSE}
+cvd_grid(corrplot)
+```
+
