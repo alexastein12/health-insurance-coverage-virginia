@@ -1,6 +1,6 @@
 ---
 title: "STAT 3280 Final Project"
-output: html_document
+output: github_document
 author: Alexa Stein
 ---
 # Socioeconomic Drivers of Health Insurance Coverage in Virginia Counties
@@ -39,8 +39,6 @@ library(transformr)
 library(kableExtra)
 library(colorblindr)
 library(scales)
-
-counties <- read.csv("Virginia Counties.csv")
 
 counties <- read.csv("Virginia Counties.csv")
 
