@@ -1,25 +1,22 @@
-# Socioeconomic Drivers of Health Insurance Coverage in Virginia Counties
+# Virginia Health Insurance: Socioeconomic Drivers of Coverage
 
-As a student with a strong interest in biostatistics and healthcare, I’ve taken several public health classes at UVA. Through these classes, I've learned about the wide range of healthcare disparities that exist in Virginia. I'm from New Jersey, which only has 21 counties, while in Virginia, there are 133 county-level entities (95 counties and 38 independent cities), so there is a much greater breadth to explore. Specifically, one key issue I’ve learned about in this topic is the disparity in healthcare insurance coverage between counties, especially between Southwest Virginia and Northern Virginia. The complexity of the American healthcare system and insurance system only complicates the issue further. Public insurance programs typically provide essential health services at a lower cost and are more accessible to lower-income populations, while private insurance generally offers greater provider choice and flexibility in care.
+**[View the Website Here](https://alexastein12.github.io/health-insurance-coverage-virginia/)**
 
-Socioeconomic factors are known to play a significant role in shaping these geographic disparities in coverage. I seek to examine the impact of education, poverty level, population density, and median household income on the different types insurance coverage across Virginia counties, focusing on the disparities between public, private, and no insurance.
+## Overview
+This project investigates county-level healthcare disparities across Virginia's 133 counties and independent cities, focusing on the structural divide between public and private insurance coverage. Utilizing 5-Year Estimates (2020-2024) from the American Community Survey (ACS), the analysis identifies how socioeconomic factors—specifically education, poverty, and median income—drive regional insurance profiles.
 
-# Research Questions:
-1. How does healthcare insurance coverage differ across the state of Virginia?
-2. What socioeconomic factors are the primary drivers of differences in healthcare insurance coverage rates?
-3. How strong are the relationships between key socioeconomic factors and insurance types?
+## Methodology & Data
+* **Data Sourcing:** Extracted and cleaned demographic and economic data from the ACS 2020-2024 dataset.
+* **Geospatial Mapping:** Engineered a Tableau choropleth map to display the geographic clustering of public coverage rates across Southwest and Northern Virginia.
+* **Statistical Animation:** Developed animated scatterplots using `gganimate` to track the relationship between educational attainment (bachelor's degrees) and insurance type, and generated a `ggcorrplot` correlation matrix to quantify socioeconomic relationships.
+* **Interactive Web Apps:** Built embedded Shiny applications utilizing `plotly` to allow users to dynamically filter coverage gaps by population density and compare specific counties against state averages.
 
-The data comes from the American Community Survey (ACS) 2020-2024 (5-Year-Estimates). The ACS is an ongoing, annual, sample survey by the U.S. Census Bureau that provides up-to-date data on economic, housing, demographic, and social topics. The information from the survey helps determine how hundreds of billions of dollars in federal and state funds are distributed each year. The U.S. Census Bureau survey samples about 295,000 addresses each month for an estimated total of 3.5 million households each year. This specific data is an accumulation of 60 straight months of survey responses between 2020 and 2024.
+## Key Findings
+* **The Uninsured Myth:** Uninsured rates are remarkably consistent across the state (averaging 6.9%), largely due to the 2019 Medicaid Expansion and ACA subsidies. The true geographic disparity lies in the ratio of public to private coverage.
+* **Education & Income as Primary Drivers:** Public insurance heavily correlates with lower educational attainment (r = -0.75) and lower median household income (r = -0.82), while private insurance shows the exact opposite trend.
+* **Density Disparities:** Rural counties exhibit significantly higher public insurance rates—with medians 10 to 12 points higher—compared to suburban and urban centers.
 
-While the ACS has data on every county in all 50 states, I selected to focus on a local level, exploring healthcare disparity in Virginia counties. There’s a wide variety of variables to choose from the ACS dataset, but for this exploration, these are the variables I selected:
-
-- % Total: No Health Insurance Coverage: respondent answered “No” to all insurance types at the time they took the survey
-- % Total: With Health Insurance Coverage: Public Health Coverage: includes federal or state government programs, specifically Medicare (for seniors/disabled), Medicaid, VA Health Care, Children’s Health Insurance Program (CHIP), and individual state health plans
-- % Total: With Health Insurance Coverage: Private Health Insurance: coverage provided through an employer or union, coverage purchased directly by an individual from an insurance company, or TRICARE/military health coverage
-- % Population 25 Years and Over: Bachelor's Degree	: The percentage of adults age 25+ who have completed a Bachelor’s degree (a 4-year degree)
-- Total Population: the complete count of individuals living in the county
-- Population Density (Per Sq. Mile): the total population of the county divided by the county’s total land area in square miles
-- % Population Age 18 to 64 for Whom Poverty Status Is Determined: Living in Poverty: working-age adults living below the poverty line. “For whom poverty status is determined” refers to the fact that the Census Bureau can not determine poverty for people in prisons, nursing homes, military barracks, or college dorms, so this variable is strictly looking at standard households.
-- Median Household Income (In 2024 Inflation Adjusted Dollars): If all households in the county were sorted from poorest to richest, this is the income of the household exactly in the middle. To account for inflation differences between 2020 and 2024, the Census adjusted all older incomes to be put in 2024 dollars to ensure accurate comparison.
-
-Please note that the health insurance classifications (public or private) are not mutually exclusive, as people may be covered by more than one at the same time. Individuals with multiple insurance types (e.g., Medicare and supplemental private plans) are counted in both categories. When looking at the state of Virginia in aggregate, the ACS 2020-2024 data shows that 6.9% of the state has no health insurance coverage, and 93.1% has health insurance coverage. Within those who have health insurance coverage, 33.6% have public health coverage, and 73.2% have private health insurance coverage, totaling 106.8%. Since we can subtract these values to find the proportion of people who have both types of coverage: 106.8% - 93.1% = 13.7% of Virginians have both public and private health insurance.
+## Tools & Libraries
+* **Languages & Software:** R, Tableau Public
+* **Libraries:** `tidyverse`, `ggplot2`, `gganimate`, `ggcorrplot`, `shiny`, `plotly`
+* **Deliverable:** R Markdown (`github_document`), Tableau Dashboard
