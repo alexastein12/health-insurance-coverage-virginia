@@ -19,4 +19,4 @@ This project investigates county-level healthcare disparities across Virginia's 
 ## Tools & Libraries
 * **Languages & Software:** R, Tableau Public
 * **Libraries:** `tidyverse`, `ggplot2`, `gganimate`, `ggcorrplot`, `shiny`, `plotly`
-* **Deliverable:** R Markdown (`github_document`), Tableau Dashboard
+* **Deliverable:** R Markdown (github_document) and an interactive HTML document (with embedded Shiny apps and Tableau visualizations).
